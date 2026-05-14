@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Google Antigravity Replica</title>
+    <meta
+      name="description"
+      content="A local study replica of the Google Antigravity landing page structure."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wdth,wght,ROND@8..144,-10..0,25..151,400..500,0..100&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Google+Symbols:opsz,wght,FILL,GRAD,ROND@40..48,300,0..1,0,50&display=block"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header" data-header>
+      <div class="grid-container header-shell">
+        <a class="brand" href="#top" aria-label="Google Antigravity home">
+          <span class="brand-google" aria-hidden="true">
+            <span class="blue">G</span><span class="red">o</span><span class="yellow">o</span
+            ><span class="blue">g</span><span class="green">l</span><span class="red">e</span>
+          </span>
+          <span class="brand-divider"></span>
+          <span class="brand-name">Antigravity</span>
+        </a>
+
+        <nav class="header-nav" aria-label="Primary navigation">
+          <div class="nav-item">
+            <button class="nav-button" data-dropdown-toggle="product" aria-expanded="false">
+              Product
+            </button>
+            <div class="dropdown-panel" data-dropdown="product">
+              <a href="#hero-video">Overview</a>
+              <a href="#features">Editor View</a>
+              <a href="#download">Download</a>
+            </div>
+          </div>
+          <div class="nav-item">
+            <button class="nav-button" data-dropdown-toggle="use-cases" aria-expanded="false">
+              Use Cases
+            </button>
+            <div class="dropdown-panel" data-dropdown="use-cases">
+              <a href="#use-cases">Frontend</a>
+              <a href="#use-cases">Full stack</a>
+              <a href="#use-cases">Enterprise</a>
+            </div>
+          </div>
+          <a class="nav-link" href="#pricing">Pricing</a>
+          <a class="nav-link" href="#blog">Blog</a>
+          <div class="nav-item">
+            <button class="nav-button" data-dropdown-toggle="resources" aria-expanded="false">
+              Resources
+            </button>
+            <div class="dropdown-panel" data-dropdown="resources">
+              <a href="#footer">Docs</a>
+              <a href="#footer">Changelog</a>
+              <a href="#footer">Support</a>
+            </div>
+          </div>
+        </nav>
+
+        <div class="header-actions">
+          <a class="button button-primary button-compact" href="#download">Download</a>
+          <button
+            class="button button-primary button-menu"
+            data-mobile-toggle
+            aria-expanded="false"
+            aria-controls="mobile-menu"
+          >
+            Menu
+          </button>
+        </div>
+      </div>
+
+      <div class="mobile-menu" id="mobile-menu" data-mobile-menu>
+        <div class="grid-container mobile-menu-inner">
+          <a href="#hero-video">Product</a>
+          <a href="#use-cases">Use Cases</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#blog">Blog</a>
+          <a href="#footer">Resources</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero-shell">
+        <div class="main-particles-component-section" aria-hidden="true">
+          <div class="main-particles-container">
+            <canvas data-particles="hero"></canvas>
+          </div>
+        </div>
+
+        <div class="grid-container hero-layout">
+          <div class="hero-copy">
+            <div class="logo-container reveal">
+              <span class="mini-logo">Google Antigravity</span>
+              <span class="hero-mark" aria-hidden="true"></span>
+            </div>
+            <h1 class="landing-main-header" data-split-text>
+              Experience liftoff with the next-gen agent platform
+              <span class="blinking-cursor" aria-hidden="true"></span>
+            </h1>
+            <div class="hero-cta reveal">
+              <a class="button button-primary" href="#download">Download for MacOS</a>
+              <a class="button button-secondary" href="#use-cases">Explore use cases</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="hero-video-section reveal" id="hero-video">
+        <div class="grid-container">
+          <div class="video-stage">
+            <div class="video-surface video-surface-hero" data-video-surface>
+              <div class="video-grid"></div>
+              <div class="video-beam"></div>
+              <div class="video-terminal">
+                <span class="terminal-dot"></span>
+                <span class="terminal-dot"></span>
+                <span class="terminal-dot"></span>
+                <strong>antigravity.workspace</strong>
+              </div>
+              <div class="video-copy">
+                <p>Agent-first workspace</p>
+                <h2>Guide every surface from one control layer.</h2>
+              </div>
+              <button class="video-toggle symbol" data-video-toggle aria-label="Play video">
+                play_arrow
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="agent-first-section">
+        <div class="grid-container text-container">
+          <div class="icon-list reveal">
+            <span>workspaces</span>
+            <span>code_blocks</span>
+            <span>stacks</span>
+            <span>terminal</span>
+            <span>ads_click</span>
+            <span>globe</span>
+            <span>labs</span>
+            <span>precision_manufacturing</span>
+          </div>
+          <div class="agent-first-content">
+            <h2 class="typed-heading reveal">
+              Google Antigravity is our agentic development platform, allowing anyone to build
+              across workspaces with a single control surface
+              <span class="blinking-cursor small-cursor" aria-hidden="true"></span>
+            </h2>
+            <p class="section-copy reveal">
+              Manage multiple agents at the same time, across any workspace, from one central
+              interface. Coordinate the editor, terminal, browser, and review surfaces without
+              shifting into separate modes.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="feature-explorer-section" id="features">
+        <div class="grid-container">
+          <article class="feature-item reveal">
+            <div class="feature-copy">
+              <p class="section-label">Editor View</p>
+              <h3>Tab completion, natural language editing, and visible task state.</h3>
+              <p>
+                The editor pane behaves like the center of gravity for code, plan, and verification
+                artifacts. This pass uses an animated placeholder rather than source MP4 footage.
+              </p>
+            </div>
+            <div class="feature-media">
+              <div class="video-surface video-square">
+                <div class="surface-window">
+                  <div class="surface-lines">
+                    <span></span><span></span><span></span><span></span>
+                  </div>
+                  <div class="surface-card">editor overlay</div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="feature-item reveal">
+            <div class="feature-copy">
+              <p class="section-label">Abstractions</p>
+              <h3>A more intuitive task-based approach to monitoring agent activity.</h3>
+              <p>
+                Replace transcript-only work with task cards, state changes, and adjacent proof so
+                the user can scan the whole system instead of reading everything linearly.
+              </p>
+            </div>
+            <div class="feature-media">
+              <div class="video-surface video-square alt-surface">
+                <div class="surface-orbits"></div>
+                <div class="surface-card large">task graph</div>
+              </div>
+            </div>
+          </article>
+
+          <article class="feature-item reveal">
+            <div class="feature-copy">
+              <p class="section-label">Cross-Surface Control</p>
+              <h3>Synchronized agentic control across your editor, terminal, and browser.</h3>
+              <p>
+                Interaction remains immediate: every surface responds to selection, progress, and
+                verification state without the layout collapsing into a dashboard cliché.
+              </p>
+            </div>
+            <div class="feature-media">
+              <div class="video-surface video-square">
+                <div class="surface-columns">
+                  <span></span><span></span><span></span>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <div class="feature-cta-wrap reveal">
+            <a class="button button-secondary" href="#use-cases">Explore Product</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="landing-use-case-section" id="use-cases">
+        <div class="grid-container landing-use-case-header reveal">
+          <div class="use-case-header-main">
+            <h2>Built for developers for the agent-first era</h2>
+          </div>
+          <p class="section-copy">
+            The replica keeps the original page rhythm: large type, wide spacing, editorial cards,
+            and image-led use-case framing.
+          </p>
+        </div>
+
+        <div class="grid-container slider-container">
+          <div class="slider-track" data-slider-track>
+            <article class="use-case-card is-active">
+              <div class="slide-image image-frontend"></div>
+              <div class="slider-copy-wrapper">
+                <h3>Frontend developer</h3>
+                <p>Shape interfaces, inspect render state, and keep browser proof close to code.</p>
+              </div>
+            </article>
+            <article class="use-case-card">
+              <div class="slide-image image-fullstack"></div>
+              <div class="slider-copy-wrapper">
+                <h3>Full stack developer</h3>
+                <p>Move across routes, APIs, and infrastructure with the same session context.</p>
+              </div>
+            </article>
+            <article class="use-case-card">
+              <div class="slide-image image-enterprise"></div>
+              <div class="slider-copy-wrapper">
+                <h3>Enterprise developer</h3>
+                <p>Keep team-scale workflows legible, repeatable, and easy to review.</p>
+              </div>
+            </article>
+          </div>
+
+          <div class="slider-controls reveal">
+            <button class="slider-control-button symbol" data-slider-prev aria-label="Previous">
+              keyboard_arrow_left
+            </button>
+            <button class="slider-control-button symbol" data-slider-next aria-label="Next">
+              keyboard_arrow_right
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="try-solutions-section" id="pricing">
+        <div class="grid-container solutions-grid">
+          <article class="solution-section reveal">
+            <div class="morphing-particles-component-section" aria-hidden="true">
+              <div class="morphing-particles-container">
+                <canvas data-particles="morph-left"></canvas>
+              </div>
+            </div>
+            <div class="solution-content">
+              <p class="section-label">Try solutions</p>
+              <h3>Start from a calmer set of primitives.</h3>
+              <p>
+                Product structure, editor mockups, and motion layers are all in place, even with
+                empty media sources.
+              </p>
+              <a class="button button-secondary" href="#download">Download</a>
+            </div>
+          </article>
+
+          <article class="solution-section reveal">
+            <div class="morphing-particles-component-section" aria-hidden="true">
+              <div class="morphing-particles-container">
+                <canvas data-particles="morph-right"></canvas>
+              </div>
+            </div>
+            <div class="solution-content">
+              <p class="section-label">Release notes</p>
+              <h3>Keep room for real media and exact copy later.</h3>
+              <p>
+                The implementation is intentionally asset-light so the visual system can settle
+                before source MP4s or proprietary imagery are introduced.
+              </p>
+              <a class="button button-secondary" href="#blog">Notify me</a>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="landing-latest-blogs" id="blog">
+        <div class="grid-container reveal">
+          <div class="landing-latest-blogs-header">
+            <h2>Latest updates</h2>
+            <a class="button button-secondary" href="#footer">View blog</a>
+          </div>
+          <div class="blog-grid">
+            <article class="blog-card">
+              <div class="blog-image blog-image-one"></div>
+              <p class="caption">Feb 20, 2026</p>
+              <h3>Gemini 3.1 Pro in Google Antigravity</h3>
+            </article>
+            <article class="blog-card">
+              <div class="blog-image blog-image-two"></div>
+              <p class="caption">Dec 18, 2025</p>
+              <h3>Gemini 3 Flash in Google Antigravity</h3>
+            </article>
+            <article class="blog-card">
+              <div class="blog-image blog-image-three"></div>
+              <p class="caption">Nov 21, 2025</p>
+              <h3>Nano Banana Pro in Google Antigravity</h3>
+            </article>
+            <article class="blog-card">
+              <div class="blog-image blog-image-four"></div>
+              <p class="caption">Nov 19, 2025</p>
+              <h3>Introducing Google Antigravity</h3>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="download-section-container" id="download">
+        <div class="grid-container">
+          <div class="download-section reveal">
+            <div class="main-particles-component-section download-particles" aria-hidden="true">
+              <div class="main-particles-container">
+                <canvas data-particles="download"></canvas>
+              </div>
+            </div>
+            <div class="download-section-content">
+              <h2>
+                Download Google Antigravity for MacOS
+                <span class="blinking-cursor small-cursor" aria-hidden="true"></span>
+              </h2>
+              <p class="section-copy">
+                Source MP4s and exact installer metadata can remain empty for now. The whole page
+                effect is already in place: grid, typography, particles, media shells, and CTA
+                states.
+              </p>
+              <div class="download-section-cta">
+                <a class="button button-primary" href="#top">Download for Apple Silicon</a>
+                <a class="button button-secondary" href="#top">Download for Intel</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer" id="footer">
+      <div class="grid-container footer-inner">
+        <div class="footer-title">
+          <p>Google Antigravity study replica.</p>
+        </div>
+        <nav class="footer-nav-section" aria-label="Footer">
+          <a href="#download">Download</a>
+          <a href="#features">Product</a>
+          <a href="#footer">Docs</a>
+          <a href="#footer">Changelog</a>
+          <a href="#blog">Blog</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#use-cases">Use Cases</a>
+        </nav>
+      </div>
+    </footer>
+
+    <script src="./main.js"></script>
+  </body>
+</html>
