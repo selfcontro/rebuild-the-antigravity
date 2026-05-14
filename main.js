@@ -161,6 +161,7 @@ class ParticleField {
     this.mode = mode;
     this.points = [];
     this.mouse = { x: -9999, y: -9999, px: -9999, py: -9999, vx: 0, vy: 0, active: false };
+    this.trail = [];
     this.running = !reduceMotion;
     this.raf = 0;
     this.frame = 0;
@@ -331,12 +332,21 @@ class ParticleField {
     this.mouse.x = nextX;
     this.mouse.y = nextY;
     this.mouse.active = true;
+    this.trail.unshift({
+      x: nextX,
+      y: nextY,
+      vx: this.mouse.vx,
+      vy: this.mouse.vy,
+      life: 1,
+    });
+    this.trail = this.trail.slice(0, 8);
   }
 
   handleLeave() {
     this.mouse.active = false;
     this.mouse.vx = 0;
     this.mouse.vy = 0;
+    this.trail = [];
   }
 
   draw() {
@@ -344,6 +354,9 @@ class ParticleField {
     const { influence, pull, settle, jitter } = this.getConfig();
     this.frame += 1;
     this.ctx.clearRect(0, 0, this.width, this.height);
+    this.trail = this.trail
+      .map((entry) => ({ ...entry, life: entry.life * 0.86 }))
+      .filter((entry) => entry.life > 0.1);
 
     for (const point of this.points) {
       const waveX = Math.sin(this.frame * 0.015 + point.phase) * jitter * point.weight;
@@ -388,6 +401,24 @@ class ParticleField {
             targetRadius = point.baseRadius * (1 + force * 1.4);
           }
           glow = Math.max(force, cursorForce);
+        }
+      }
+
+      for (const entry of this.trail) {
+        const tx = point.homeX - entry.x;
+        const ty = point.homeY - entry.y;
+        const trailDistanceSq = tx * tx + ty * ty;
+        const trailRadius = influence * 0.78 * entry.life;
+        if (trailDistanceSq < trailRadius * trailRadius) {
+          const trailDistance = Math.sqrt(trailDistanceSq) || 1;
+          const trailForce = (1 - trailDistance / trailRadius) * entry.life;
+          targetOffsetX -= entry.vx * trailForce * 0.48;
+          targetOffsetY -= entry.vy * trailForce * 0.26;
+          if (this.mode === "hero") {
+            targetScaleY = Math.max(targetScaleY, 1 + trailForce * 2.1);
+            targetScaleX = Math.min(targetScaleX, 0.92 - trailForce * 0.28);
+            glow = Math.max(glow, trailForce * 0.85);
+          }
         }
       }
 
