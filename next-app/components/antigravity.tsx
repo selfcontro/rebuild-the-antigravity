@@ -248,7 +248,7 @@ function AntigravityInner({
 
 export function Antigravity(props: AntigravityProps) {
   return (
-    <Canvas camera={{ position: [0, 0, 50], fov: 35 }} dpr={[1, 2]}>
+    <Canvas camera={{ position: [0, 0, 50], fov: 35 }} dpr={[1, 2]} style={{ width: "100%", height: "100%" }}>
       <AntigravityInner {...props} />
     </Canvas>
   )
