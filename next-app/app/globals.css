@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --ag-bg: #f5f6fb;
-  --ag-surface: rgba(255, 255, 255, 0.88);
-  --ag-surface-strong: rgba(255, 255, 255, 0.96);
+  --ag-bg: #f8faff;
+  --ag-surface: rgba(255, 255, 255, 0.9);
+  --ag-surface-strong: rgba(255, 255, 255, 0.98);
   --ag-ink: #14161d;
   --ag-muted: #5f6472;
   --ag-line: rgba(20, 22, 29, 0.08);
@@ -17,9 +17,9 @@ body {
 
 body {
   background:
-    radial-gradient(circle at top, rgba(255, 159, 252, 0.16), transparent 20%),
-    radial-gradient(circle at 80% 20%, rgba(133, 179, 255, 0.18), transparent 22%),
-    linear-gradient(180deg, #f9fbff 0%, var(--ag-bg) 60%, #f2f4f8 100%);
+    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.98), transparent 18%),
+    radial-gradient(circle at 80% 20%, rgba(215, 228, 255, 0.28), transparent 24%),
+    linear-gradient(180deg, #ffffff 0%, var(--ag-bg) 55%, #f3f6fb 100%);
   color: var(--ag-ink);
 }
 
@@ -181,8 +181,8 @@ a {
   border: 1px solid var(--ag-line);
   border-radius: 40px;
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.82), rgba(245, 246, 251, 0.42)),
-    rgba(255, 255, 255, 0.28);
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.98), rgba(244, 248, 255, 0.72)),
+    rgba(255, 255, 255, 0.44);
   box-shadow: var(--ag-shadow);
   overflow: hidden;
 }

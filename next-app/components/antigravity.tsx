@@ -1,7 +1,7 @@
 "use client"
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
-import { useMemo, useRef } from "react"
+import { useLayoutEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 
 type ParticleShape = "capsule" | "sphere" | "box" | "tetrahedron"
@@ -37,6 +37,7 @@ type ParticleRecord = {
   vy: number
   vz: number
   randomRadiusOffset: number
+  colorSeed: number
 }
 
 function seededUnit(index: number, salt: number) {
@@ -64,7 +65,9 @@ function AntigravityInner({
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const { viewport } = useThree()
   const dummy = useMemo(() => new THREE.Object3D(), [])
-
+  const colorAttributeRef = useRef<THREE.InstancedBufferAttribute | null>(null)
+  const colorDummy = useMemo(() => new THREE.Color(), [])
+  const accentColor = useMemo(() => new THREE.Color(color), [color])
   const lastMousePos = useRef({ x: 0, y: 0 })
   const lastMouseMoveTime = useRef(0)
   const virtualMouse = useRef({ x: 0, y: 0 })
@@ -94,15 +97,40 @@ function AntigravityInner({
         vy: 0,
         vz: 0,
         randomRadiusOffset: (seededUnit(index, 6) - 0.5) * 2,
+        colorSeed: seededUnit(index, 7),
       })
     }
 
     return records
   }, [count, viewport.height, viewport.width])
 
-  useFrame((state) => {
+  useLayoutEffect(() => {
     const mesh = meshRef.current
     if (!mesh) return
+
+    const colorAttribute = new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3)
+    mesh.geometry.setAttribute("instanceTone", colorAttribute)
+    colorAttributeRef.current = colorAttribute
+
+    for (let index = 0; index < count; index += 1) {
+      colorAttribute.setXYZ(index, accentColor.r, accentColor.g, accentColor.b)
+    }
+
+    colorAttribute.needsUpdate = true
+    const material = mesh.material
+    if (Array.isArray(material)) {
+      material.forEach((entry) => {
+        entry.needsUpdate = true
+      })
+    } else {
+      material.needsUpdate = true
+    }
+  }, [accentColor, count])
+
+  useFrame((state) => {
+    const mesh = meshRef.current
+    const colorAttribute = colorAttributeRef.current
+    if (!mesh || !colorAttribute) return
 
     const { viewport: view, pointer } = state
     const mouseDistance = Math.hypot(pointer.x - lastMousePos.current.x, pointer.y - lastMousePos.current.y)
@@ -130,6 +158,7 @@ function AntigravityInner({
 
     particles.forEach((particle, index) => {
       const currentT = (particle.t += particle.speed / 2)
+      const time = state.clock.getElapsedTime()
       const projectionFactor = 1 - particle.cz / 50
       const projectedTargetX = targetX * projectionFactor
       const projectedTargetY = targetY * projectionFactor
@@ -170,13 +199,63 @@ function AntigravityInner({
       const normalizedScale = Math.max(0, Math.min(1, 1 - distanceFromRing / 10))
       const pulse = 0.8 + Math.sin(currentT * pulseSpeed) * 0.2 * particleVariance
       const finalScale = normalizedScale * pulse * particleSize
+      const fieldMix = Math.max(0, Math.min(1, 1 - distance / (magnetRadius * 1.9)))
+      const depthMix = Math.max(0, Math.min(1, 1 - Math.abs(particle.cz) / 24))
+      const anchorX = particle.mx
+      const anchorY = particle.my
+      const anchorZ = particle.mz * depthFactor
+      const fieldPhase = particle.colorSeed * Math.PI * 2
+      const radialDistance = Math.hypot(particle.cx - projectedTargetX, particle.cy - projectedTargetY)
+      const radialNorm = THREE.MathUtils.clamp(radialDistance / Math.max(magnetRadius * 2, 0.001), 0, 1)
+      const radialWave = Math.sin(time * 2.8 - radialNorm * 8.4 + fieldPhase * 0.7) * 0.5 + 0.5
+      const orbitalWave = Math.cos(time * 1.65 + Math.atan2(dy, dx) * 1.45 + fieldPhase) * 0.5 + 0.5
+      const depthWave = Math.sin(time * 1.1 + anchorZ * 0.03 + fieldPhase * 0.8) * 0.5 + 0.5
+      const breathe = Math.sin(time * 2.4 + anchorX * 0.006 + anchorY * 0.004 + fieldPhase) * 0.5 + 0.5
+      const shimmer = Math.cos(time * 1.9 + anchorY * 0.009 - anchorZ * 0.013 + fieldPhase * 0.45) * 0.5 + 0.5
+      const hue = THREE.MathUtils.euclideanModulo(
+        0.06 +
+          radialNorm * 0.52 +
+          radialWave * 0.18 +
+          orbitalWave * 0.12 +
+          depthWave * 0.08 +
+          time * 0.075,
+        1
+      )
+      const saturation = THREE.MathUtils.clamp(
+        0.82 + breathe * 0.08 + shimmer * 0.06 + fieldMix * 0.08,
+        0.78,
+        1
+      )
+      const lightness = THREE.MathUtils.clamp(
+        0.52 + depthMix * 0.08 + radialWave * 0.1 - radialNorm * 0.08 + fieldMix * 0.08,
+        0.42,
+        0.72
+      )
+      const accentBlend = THREE.MathUtils.clamp(fieldMix * 0.12 + breathe * 0.04, 0, 0.18)
+
+      colorDummy.setHSL(hue, saturation, lightness).lerp(accentColor, accentBlend)
 
       dummy.scale.set(finalScale, finalScale, finalScale)
       dummy.updateMatrix()
       mesh.setMatrixAt(index, dummy.matrix)
+      colorAttribute.setXYZ(index, colorDummy.r, colorDummy.g, colorDummy.b)
     })
 
     mesh.instanceMatrix.needsUpdate = true
+    colorAttribute.needsUpdate = true
+
+    const debugGlobal = globalThis as typeof globalThis & {
+      __agDebug?: {
+        hasInstanceColor: boolean
+        colorSample: number[]
+        firstParticleColor: string
+      }
+    }
+    debugGlobal.__agDebug = {
+      hasInstanceColor: true,
+      colorSample: Array.from(colorAttribute.array.slice(0, 12)),
+      firstParticleColor: `#${colorDummy.getHexString()}`,
+    }
   })
 
   return (
@@ -185,7 +264,27 @@ function AntigravityInner({
       {particleShape === "sphere" && <sphereGeometry args={[0.2, 16, 16]} />}
       {particleShape === "box" && <boxGeometry args={[0.3, 0.3, 0.3]} />}
       {particleShape === "tetrahedron" && <tetrahedronGeometry args={[0.3]} />}
-      <meshBasicMaterial color={color} />
+      <shaderMaterial
+        transparent
+        uniforms={{}}
+        vertexShader={`
+          attribute vec3 instanceTone;
+          varying vec3 vTone;
+
+          void main() {
+            vTone = instanceTone;
+            vec4 worldPosition = instanceMatrix * vec4(position, 1.0);
+            gl_Position = projectionMatrix * modelViewMatrix * worldPosition;
+          }
+        `}
+        fragmentShader={`
+          varying vec3 vTone;
+
+          void main() {
+            gl_FragColor = vec4(vTone, 0.98);
+          }
+        `}
+      />
     </instancedMesh>
   )
 }
