@@ -129,15 +129,15 @@ export function stepParticleMotion({
   const ringBandCenter = Math.max(ringRadius * 1.12, 0.001)
   const ringBandNorm = Math.min(1, Math.abs(anchorDistance - ringBandCenter) / Math.max(magnetRadius * 0.85, 0.001))
   const ringBandMix = 1 - ringBandNorm
-  const flowSpeed = 0.006 + depthFactor * 0.001 + fieldStrength * 0.00025
-  const flowPulse = 0.82 + 0.18 * Math.sin(carrierPhase)
-  const crossDrift = Math.sin(currentT * 0.27 + alongFlow * 0.028 + phaseOffset) * 0.0024
+  const flowSpeed = 0.0024 + depthFactor * 0.00045 + fieldStrength * 0.00008
+  const flowPulse = 0.88 + 0.12 * Math.sin(carrierPhase)
+  const crossDrift = Math.sin(currentT * 0.27 + alongFlow * 0.028 + phaseOffset) * 0.0009
   const baseFlowX = dirX * flowSpeed * flowPulse + normalX * crossDrift
   const baseFlowY = dirY * flowSpeed * flowPulse + normalY * crossDrift
   const baseFlowZ =
     Math.sin(currentT * 0.42 + baseX * 0.012 + baseY * 0.01) * 0.012 * depthFactor
 
-  const ringHoldStrength = 0.01 + ringBandMix * 0.03 + activation * 0.012
+  const ringHoldStrength = 0.018 + ringBandMix * 0.05 + activation * 0.014
   const ringTargetDistance = anchorDistance - ringBandCenter
   const ringHoldX = anchorDistance > 0.0001 ? (-anchorDx / anchorDistance) * ringTargetDistance * ringHoldStrength : 0
   const ringHoldY = anchorDistance > 0.0001 ? (-anchorDy / anchorDistance) * ringTargetDistance * ringHoldStrength : 0
@@ -149,20 +149,20 @@ export function stepParticleMotion({
   if (activation > 0.001 && distance > 0.0001) {
     const nx = anchorDx / Math.max(Math.hypot(anchorDx, anchorDy), 0.0001)
     const ny = anchorDy / Math.max(Math.hypot(anchorDx, anchorDy), 0.0001)
-    const waveEnvelope = activation * Math.exp(-waveFront * 0.32)
-    const radialWave = Math.sin(wavePhase) * waveAmplitude * (0.003 + waveEnvelope * 0.01) * (0.72 + ringBandMix * 0.28)
-    const inwardReturn = -Math.cos(wavePhase * 0.7 + 0.6) * (0.0015 + waveEnvelope * 0.004)
-    const directionalLift = dirX * radialWave * 0.12 + normalX * radialWave * 0.04
-    const directionalLiftY = dirY * radialWave * 0.12 + normalY * radialWave * 0.04
-    const anisotropy = 0.55 + 0.45 * Math.max(0, dirX * nx + dirY * ny)
-    const cursorDrag = (0.001 + activation * 0.004) * (0.75 + 0.25 * Math.sin(carrierPhase))
+    const waveEnvelope = activation * Math.exp(-waveFront * 0.52)
+    const radialWave = Math.sin(wavePhase) * waveAmplitude * (0.0014 + waveEnvelope * 0.0048) * (0.8 + ringBandMix * 0.2)
+    const inwardReturn = -Math.cos(wavePhase * 0.7 + 0.6) * (0.0008 + waveEnvelope * 0.0022)
+    const directionalLift = dirX * radialWave * 0.05 + normalX * radialWave * 0.018
+    const directionalLiftY = dirY * radialWave * 0.05 + normalY * radialWave * 0.018
+    const anisotropy = 0.62 + 0.38 * Math.max(0, dirX * nx + dirY * ny)
+    const cursorDrag = (0.00035 + activation * 0.0014) * (0.75 + 0.25 * Math.sin(carrierPhase))
 
     accelX += nx * (radialWave + inwardReturn) * anisotropy + directionalLift + targetVelocityX * cursorDrag
     accelY += ny * (radialWave + inwardReturn) * anisotropy + directionalLiftY + targetVelocityY * cursorDrag
   }
 
   const accelMagnitude = Math.hypot(accelX, accelY, accelZ)
-  const maxAccel = 0.12 + activation * 0.3 + waveAmplitude * 0.018
+  const maxAccel = 0.06 + activation * 0.14 + waveAmplitude * 0.01
   if (accelMagnitude > maxAccel) {
     const accelScale = maxAccel / accelMagnitude
     accelX *= accelScale
@@ -174,21 +174,21 @@ export function stepParticleMotion({
   let nextVelocityY = velocityY + accelY * step
   let nextVelocityZ = velocityZ + accelZ * step
 
-  const damping = Math.pow(0.89 + radialNorm * 0.06, step)
-  const zDamping = Math.pow(0.91 + radialNorm * 0.05, step)
+  const damping = Math.pow(0.92 + radialNorm * 0.04, step)
+  const zDamping = Math.pow(0.94 + radialNorm * 0.03, step)
   nextVelocityX *= damping
   nextVelocityY *= damping
   nextVelocityZ *= zDamping
 
   const planarSpeed = Math.hypot(nextVelocityX, nextVelocityY)
-  const maxPlanarSpeed = 0.08 + activation * (0.24 + fieldStrength * 0.004) + Math.abs(randomRadiusOffset) * 0.018
+  const maxPlanarSpeed = 0.032 + activation * (0.09 + fieldStrength * 0.0016) + Math.abs(randomRadiusOffset) * 0.008
   if (planarSpeed > maxPlanarSpeed) {
     const speedScale = maxPlanarSpeed / planarSpeed
     nextVelocityX *= speedScale
     nextVelocityY *= speedScale
   }
 
-  const maxDepthSpeed = 0.05 + activation * 0.08
+  const maxDepthSpeed = 0.024 + activation * 0.035
   if (Math.abs(nextVelocityZ) > maxDepthSpeed) {
     nextVelocityZ = Math.sign(nextVelocityZ) * maxDepthSpeed
   }

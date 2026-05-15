@@ -4,7 +4,10 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import { useLayoutEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import { computeAntigravityColor } from "@/lib/antigravity-color"
+import { computeParticleDeformation } from "@/lib/antigravity-deformation"
+import { createVirtualPointerState, getInteractionTarget } from "@/lib/antigravity-interaction"
 import { stepParticleMotion, stepVirtualPointer } from "@/lib/antigravity-motion"
+import { createParticles } from "@/lib/antigravity-particles"
 
 type ParticleShape = "capsule" | "sphere" | "box" | "tetrahedron"
 
@@ -24,27 +27,6 @@ type AntigravityProps = {
   pulseSpeed?: number
   particleShape?: ParticleShape
   fieldStrength?: number
-}
-
-type ParticleRecord = {
-  t: number
-  speed: number
-  mx: number
-  my: number
-  mz: number
-  cx: number
-  cy: number
-  cz: number
-  vx: number
-  vy: number
-  vz: number
-  randomRadiusOffset: number
-  colorSeed: number
-}
-
-function seededUnit(index: number, salt: number) {
-  const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453123
-  return value - Math.floor(value)
 }
 
 function AntigravityInner({
@@ -72,39 +54,17 @@ function AntigravityInner({
   const accentColor = useMemo(() => new THREE.Color(color), [color])
   const lastMousePos = useRef({ x: 0, y: 0 })
   const lastMouseMoveTime = useRef(0)
-  const virtualMouse = useRef({ x: 0, y: 0, vx: 0, vy: 0 })
+  const virtualMouse = useRef(createVirtualPointerState())
 
-  const particles = useMemo<ParticleRecord[]>(() => {
-    const records: ParticleRecord[] = []
-    const width = viewport.width || 100
-    const height = viewport.height || 100
-
-    for (let index = 0; index < count; index += 1) {
-      const t = seededUnit(index, 1) * 100
-      const speed = 0.01 + seededUnit(index, 2) / 200
-      const x = (seededUnit(index, 3) - 0.5) * width
-      const y = (seededUnit(index, 4) - 0.5) * height
-      const z = (seededUnit(index, 5) - 0.5) * 20
-
-      records.push({
-        t,
-        speed,
-        mx: x,
-        my: y,
-        mz: z,
-        cx: x,
-        cy: y,
-        cz: z,
-        vx: 0,
-        vy: 0,
-        vz: 0,
-        randomRadiusOffset: (seededUnit(index, 6) - 0.5) * 2,
-        colorSeed: seededUnit(index, 7),
-      })
-    }
-
-    return records
-  }, [count, viewport.height, viewport.width])
+  const particles = useMemo(
+    () =>
+      createParticles({
+        count,
+        height: viewport.height || 100,
+        width: viewport.width || 100,
+      }),
+    [count, viewport.height, viewport.width]
+  )
 
   useLayoutEffect(() => {
     const mesh = meshRef.current
@@ -142,14 +102,16 @@ function AntigravityInner({
       lastMousePos.current = { x: pointer.x, y: pointer.y }
     }
 
-    let destinationX = (pointer.x * view.width) / 2
-    let destinationY = (pointer.y * view.height) / 2
-
-    if (autoAnimate && Date.now() - lastMouseMoveTime.current > 2000) {
-      const time = state.clock.getElapsedTime()
-      destinationX = Math.sin(time * 0.5) * (view.width / 4)
-      destinationY = Math.cos(time) * (view.height / 4)
-    }
+    const time = state.clock.getElapsedTime()
+    const { destinationX, destinationY } = getInteractionTarget({
+      autoAnimate,
+      lastMouseMoveTime: lastMouseMoveTime.current,
+      pointerX: pointer.x,
+      pointerY: pointer.y,
+      time,
+      viewportHeight: view.height,
+      viewportWidth: view.width,
+    })
 
     virtualMouse.current = stepVirtualPointer({
       currentX: virtualMouse.current.x,
@@ -163,12 +125,11 @@ function AntigravityInner({
 
     const targetX = virtualMouse.current.x
     const targetY = virtualMouse.current.y
-    const globalRotation = state.clock.getElapsedTime() * rotationSpeed
+    const globalRotation = time * rotationSpeed
     const motionGain = THREE.MathUtils.clamp(0.72 + lerpSpeed * 0.5, 0.72, 0.95)
 
     particles.forEach((particle, index) => {
       const currentT = (particle.t += particle.speed / 2)
-      const time = state.clock.getElapsedTime()
       const motion = stepParticleMotion({
         currentT,
         currentX: particle.cx,
@@ -202,22 +163,9 @@ function AntigravityInner({
       particle.vy = motion.velocityY
       particle.vz = motion.velocityZ
 
-      dummy.position.set(particle.cx, particle.cy, particle.cz)
-      const velocityLookahead = 8
-      dummy.lookAt(
-        particle.cx + particle.vx * velocityLookahead,
-        particle.cy + particle.vy * velocityLookahead,
-        particle.cz + particle.vz * velocityLookahead * 0.5
-      )
-      dummy.rotateX(Math.PI / 2)
-
       const dx = particle.mx - motion.projectedTargetX
       const dy = particle.my - motion.projectedTargetY
       const currentDistanceToMouse = Math.hypot(particle.cx - motion.projectedTargetX, particle.cy - motion.projectedTargetY)
-      const distanceFromRing = Math.abs(currentDistanceToMouse - ringRadius)
-      const normalizedScale = Math.max(0, Math.min(1, 1 - distanceFromRing / 10))
-      const pulse = 0.78 + Math.sin(currentT * pulseSpeed) * 0.18 * particleVariance + motion.fieldMix * 0.08
-      const finalScale = normalizedScale * pulse * particleSize
       const fieldMix = motion.fieldMix
       const depthMix = Math.max(0, Math.min(1, 1 - Math.abs(particle.cz) / 24))
       const anchorX = particle.mx
@@ -238,7 +186,26 @@ function AntigravityInner({
 
       colorDummy.setHSL(hue, saturation, lightness).lerp(accentColor, accentBlend)
 
-      dummy.scale.set(finalScale, finalScale, finalScale)
+      const deformation = computeParticleDeformation({
+        currentDistanceToMouse,
+        currentT,
+        fieldMix,
+        particleSize,
+        particleVariance,
+        pulseSpeed,
+        ringRadius,
+        velocityX: particle.vx,
+        velocityY: particle.vy,
+        velocityZ: particle.vz,
+        x: particle.cx,
+        y: particle.cy,
+        z: particle.cz,
+      })
+
+      dummy.position.set(particle.cx, particle.cy, particle.cz)
+      dummy.lookAt(deformation.lookAtX, deformation.lookAtY, deformation.lookAtZ)
+      dummy.rotateX(Math.PI / 2)
+      dummy.scale.set(deformation.scaleX, deformation.scaleY, deformation.scaleZ)
       dummy.updateMatrix()
       mesh.setMatrixAt(index, dummy.matrix)
       colorAttribute.setXYZ(index, colorDummy.r, colorDummy.g, colorDummy.b)
