@@ -106,8 +106,9 @@ export function stepParticleMotion({
   const radialNorm = THREE.MathUtils.clamp(distance / Math.max(influenceRadius, 0.001), 0, 1)
   const fieldMix = 1 - radialNorm
   const activation = THREE.MathUtils.smoothstep(fieldMix, 0.03, 0.96)
-  const anchorDx = baseX - projectedTargetX
-  const anchorDy = baseY - projectedTargetY
+  const anchorDx = baseX
+  const anchorDy = baseY
+  const anchorDistance = Math.hypot(anchorDx, anchorDy)
   const phaseOffset = particlePhase(randomRadiusOffset)
   const flowAngle = -0.72 + globalRotation * 0.08
   const dirX = Math.cos(flowAngle)
@@ -118,51 +119,67 @@ export function stepParticleMotion({
   const acrossFlow = anchorDx * normalX + anchorDy * normalY
   const ellipticalDistance = Math.hypot(alongFlow * 0.68, acrossFlow * 1.18)
   const waveFront = ellipticalDistance / Math.max(magnetRadius * 0.72, 0.001)
-  const wavePhase = currentT * (0.82 + waveSpeed * 0.9) - waveFront * 5.4 + phaseOffset
+  const wavePhase = currentT * (1.36 + waveSpeed * 1.58) - waveFront * 5.2 + phaseOffset
   const carrierPhase = currentT * 0.38 + alongFlow * 0.045 + phaseOffset
-
-  const restoreX = (baseX - currentX) * (0.008 + activation * 0.018)
-  const restoreY = (baseY - currentY) * (0.008 + activation * 0.018)
-  const restoreZ = baseZ * depthFactor - currentZ
-
-  const anchorDistance = Math.hypot(anchorDx, anchorDy)
-  const ringBandCenter = Math.max(ringRadius * 1.12, 0.001)
-  const ringBandNorm = Math.min(1, Math.abs(anchorDistance - ringBandCenter) / Math.max(magnetRadius * 0.85, 0.001))
-  const ringBandMix = 1 - ringBandNorm
-  const flowSpeed = 0.0024 + depthFactor * 0.00045 + fieldStrength * 0.00008
+  const bandEnvelope = Math.exp(-Math.pow(anchorDistance / Math.max(influenceRadius * 0.92, 0.001), 2))
+  const ringBandMix = THREE.MathUtils.clamp(activation * 0.68 + bandEnvelope * 0.32, 0, 1)
+  const flowSpeed = 0.0024 + depthFactor * 0.0004 + fieldStrength * 0.00008
   const flowPulse = 0.88 + 0.12 * Math.sin(carrierPhase)
-  const crossDrift = Math.sin(currentT * 0.27 + alongFlow * 0.028 + phaseOffset) * 0.0009
+  const crossDrift = Math.sin(currentT * 0.27 + alongFlow * 0.028 + phaseOffset) * 0.00085
   const baseFlowX = dirX * flowSpeed * flowPulse + normalX * crossDrift
   const baseFlowY = dirY * flowSpeed * flowPulse + normalY * crossDrift
   const baseFlowZ =
     Math.sin(currentT * 0.42 + baseX * 0.012 + baseY * 0.01) * 0.012 * depthFactor
 
-  const ringHoldStrength = 0.018 + ringBandMix * 0.05 + activation * 0.014
-  const ringTargetDistance = anchorDistance - ringBandCenter
-  const ringHoldX = anchorDistance > 0.0001 ? (-anchorDx / anchorDistance) * ringTargetDistance * ringHoldStrength : 0
-  const ringHoldY = anchorDistance > 0.0001 ? (-anchorDy / anchorDistance) * ringTargetDistance * ringHoldStrength : 0
+  let desiredX = baseX
+  let desiredY = baseY
+  let waveEnvelope = 0
+  let waveDisplacement = 0
 
-  let accelX = baseFlowX + restoreX + ringHoldX
-  let accelY = baseFlowY + restoreY + ringHoldY
+  if (activation > 0.001 && anchorDistance > 0.0001) {
+    const nx = anchorDx / anchorDistance
+    const ny = anchorDy / anchorDistance
+    const breathingSignal = Math.sin(wavePhase)
+    const crest = Math.max(0, breathingSignal)
+    const trough = Math.max(0, -breathingSignal)
+    const shellMix =
+      THREE.MathUtils.smoothstep(radialNorm, 0.1, 0.2) *
+      (1 - THREE.MathUtils.smoothstep(radialNorm, 0.58, 0.84))
+    waveEnvelope = activation * Math.exp(-waveFront * 0.44) * (0.58 + shellMix * 0.42)
+    const outwardOffset = crest * (0.034 + waveEnvelope * 0.13)
+    const inwardOffset = trough * (0.038 + waveEnvelope * 0.145)
+    const bandLimit = influenceRadius * 0.022
+    waveDisplacement = THREE.MathUtils.clamp(
+      (outwardOffset - inwardOffset) * waveAmplitude * shellMix,
+      -bandLimit,
+      bandLimit
+    )
+    desiredX += nx * waveDisplacement
+    desiredY += ny * waveDisplacement
+  }
+
+  const restoreX = (desiredX - currentX) * (0.018 + activation * 0.034)
+  const restoreY = (desiredY - currentY) * (0.018 + activation * 0.034)
+  const restoreZ = baseZ * depthFactor - currentZ
+
+  let accelX = baseFlowX + restoreX
+  let accelY = baseFlowY + restoreY
   let accelZ = baseFlowZ + restoreZ * (0.01 + activation * 0.012)
 
   if (activation > 0.001 && distance > 0.0001) {
-    const nx = anchorDx / Math.max(Math.hypot(anchorDx, anchorDy), 0.0001)
-    const ny = anchorDy / Math.max(Math.hypot(anchorDx, anchorDy), 0.0001)
-    const waveEnvelope = activation * Math.exp(-waveFront * 0.52)
-    const radialWave = Math.sin(wavePhase) * waveAmplitude * (0.0014 + waveEnvelope * 0.0048) * (0.8 + ringBandMix * 0.2)
-    const inwardReturn = -Math.cos(wavePhase * 0.7 + 0.6) * (0.0008 + waveEnvelope * 0.0022)
-    const directionalLift = dirX * radialWave * 0.05 + normalX * radialWave * 0.018
-    const directionalLiftY = dirY * radialWave * 0.05 + normalY * radialWave * 0.018
-    const anisotropy = 0.62 + 0.38 * Math.max(0, dirX * nx + dirY * ny)
-    const cursorDrag = (0.00035 + activation * 0.0014) * (0.75 + 0.25 * Math.sin(carrierPhase))
+    const nx = anchorDx / Math.max(anchorDistance, 0.0001)
+    const ny = anchorDy / Math.max(anchorDistance, 0.0001)
+    const directionalLift = dirX * waveDisplacement * 0.011 + normalX * waveDisplacement * 0.0045
+    const directionalLiftY = dirY * waveDisplacement * 0.011 + normalY * waveDisplacement * 0.0045
+    const anisotropy = 0.72 + 0.28 * Math.max(0, dirX * nx + dirY * ny)
+    const cursorDrag = (0.0004 + activation * 0.0014) * (0.76 + 0.24 * Math.sin(carrierPhase))
 
-    accelX += nx * (radialWave + inwardReturn) * anisotropy + directionalLift + targetVelocityX * cursorDrag
-    accelY += ny * (radialWave + inwardReturn) * anisotropy + directionalLiftY + targetVelocityY * cursorDrag
+    accelX += nx * waveDisplacement * 0.07 * anisotropy + directionalLift + targetVelocityX * cursorDrag
+    accelY += ny * waveDisplacement * 0.07 * anisotropy + directionalLiftY + targetVelocityY * cursorDrag
   }
 
   const accelMagnitude = Math.hypot(accelX, accelY, accelZ)
-  const maxAccel = 0.06 + activation * 0.14 + waveAmplitude * 0.01
+  const maxAccel = 0.062 + activation * 0.15 + waveAmplitude * 0.01
   if (accelMagnitude > maxAccel) {
     const accelScale = maxAccel / accelMagnitude
     accelX *= accelScale
@@ -174,21 +191,21 @@ export function stepParticleMotion({
   let nextVelocityY = velocityY + accelY * step
   let nextVelocityZ = velocityZ + accelZ * step
 
-  const damping = Math.pow(0.92 + radialNorm * 0.04, step)
-  const zDamping = Math.pow(0.94 + radialNorm * 0.03, step)
+  const damping = Math.pow(0.94 + radialNorm * 0.03, step)
+  const zDamping = Math.pow(0.955 + radialNorm * 0.02, step)
   nextVelocityX *= damping
   nextVelocityY *= damping
   nextVelocityZ *= zDamping
 
   const planarSpeed = Math.hypot(nextVelocityX, nextVelocityY)
-  const maxPlanarSpeed = 0.032 + activation * (0.09 + fieldStrength * 0.0016) + Math.abs(randomRadiusOffset) * 0.008
+  const maxPlanarSpeed = 0.026 + activation * (0.075 + fieldStrength * 0.001) + Math.abs(randomRadiusOffset) * 0.0045
   if (planarSpeed > maxPlanarSpeed) {
     const speedScale = maxPlanarSpeed / planarSpeed
     nextVelocityX *= speedScale
     nextVelocityY *= speedScale
   }
 
-  const maxDepthSpeed = 0.024 + activation * 0.035
+  const maxDepthSpeed = 0.024 + activation * 0.036
   if (Math.abs(nextVelocityZ) > maxDepthSpeed) {
     nextVelocityZ = Math.sign(nextVelocityZ) * maxDepthSpeed
   }
@@ -201,9 +218,15 @@ export function stepParticleMotion({
     nextZ: currentZ + nextVelocityZ * step,
     projectedTargetX,
     projectedTargetY,
+    anchorX: baseX,
+    anchorY: baseY,
     velocityX: nextVelocityX,
     velocityY: nextVelocityY,
     velocityZ: nextVelocityZ,
+    waveDisplacement,
+    waveEnvelope,
+    wavePhase,
+    ringBandMix,
   }
 }
 
