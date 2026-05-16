@@ -1,26 +1,54 @@
-/* eslint-disable react-hooks/immutability */
 "use client"
 
-import { Canvas, useFrame, useThree } from "@react-three/fiber"
+/* eslint-disable react-hooks/immutability */
 import { useEffect, useMemo, useRef } from "react"
+import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import * as THREE from "three"
 
+type MedusaeConfig = {
+  cursor?: {
+    radius?: number
+    strength?: number
+    dragFactor?: number
+  }
+  halo?: {
+    outerOscFrequency?: number
+    outerOscAmplitude?: number
+    radiusBase?: number
+    radiusAmplitude?: number
+    shapeAmplitude?: number
+    rimWidth?: number
+    outerStartOffset?: number
+    outerEndOffset?: number
+    scaleX?: number
+    scaleY?: number
+  }
+  particles?: {
+    baseSize?: number
+    activeSize?: number
+    blobScaleX?: number
+    blobScaleY?: number
+    rotationSpeed?: number
+    rotationJitter?: number
+    cursorFollowStrength?: number
+    oscillationFactor?: number
+    colorBase?: string
+    colorOne?: string
+    colorTwo?: string
+    colorThree?: string
+  }
+  background?: {
+    color?: string
+  }
+}
+
 type AntigravityProps = {
-  particleColumns?: number
-  particleRows?: number
-  baseColor?: string
-  colorIntensity?: number
-  fieldStrength?: number
+  className?: string
+  config?: MedusaeConfig
+  style?: React.CSSProperties
 }
 
-type ParticleAttributeInput = {
-  columns: number
-  rows: number
-  width: number
-  height: number
-}
-
-const MEDUSAE_MOTION_DEFAULTS = {
+const MEDUSAE_DEFAULTS: Required<MedusaeConfig> = {
   cursor: {
     radius: 0.065,
     strength: 3,
@@ -29,7 +57,6 @@ const MEDUSAE_MOTION_DEFAULTS = {
   halo: {
     outerOscFrequency: 2.6,
     outerOscAmplitude: 0.76,
-    displayScale: 3.0,
     radiusBase: 2.4,
     radiusAmplitude: 0.5,
     shapeAmplitude: 0.75,
@@ -42,7 +69,6 @@ const MEDUSAE_MOTION_DEFAULTS = {
   particles: {
     baseSize: 0.016,
     activeSize: 0.044,
-    displayScale: 2.2,
     blobScaleX: 1,
     blobScaleY: 0.6,
     rotationSpeed: 0.1,
@@ -54,284 +80,311 @@ const MEDUSAE_MOTION_DEFAULTS = {
     colorTwo: "#eb4236",
     colorThree: "#faba03",
   },
-} as const
-
-function seededUnit(index: number, salt: number) {
-  const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453123
-  return value - Math.floor(value)
+  background: {
+    color: "#ffffff",
+  },
 }
 
-function createParticleGeometry({ columns, rows, width, height }: ParticleAttributeInput) {
-  const geometry = new THREE.PlaneGeometry(1, 1)
-  const count = columns * rows
-  const offsets = new Float32Array(count * 3)
-  const randoms = new Float32Array(count)
-  const safeColumns = Math.max(2, columns)
-  const safeRows = Math.max(2, rows)
-  const jitter = 0.25
+const mergeConfig = (config?: MedusaeConfig) => ({
+  cursor: { ...MEDUSAE_DEFAULTS.cursor, ...(config?.cursor ?? {}) },
+  halo: { ...MEDUSAE_DEFAULTS.halo, ...(config?.halo ?? {}) },
+  particles: { ...MEDUSAE_DEFAULTS.particles, ...(config?.particles ?? {}) },
+  background: { ...MEDUSAE_DEFAULTS.background, ...(config?.background ?? {}) },
+})
 
-  let index = 0
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < columns; column += 1) {
-      const u = column / (safeColumns - 1)
-      const v = row / (safeRows - 1)
-      const seed = seededUnit(index, 1)
-      const xSeed = seededUnit(index, 2) - 0.5
-      const ySeed = seededUnit(index, 3) - 0.5
+function Particles({ config }: { config?: MedusaeConfig }) {
+  const meshRef = useRef<THREE.InstancedMesh>(null)
+  const { viewport } = useThree()
+  const merged = useMemo(() => mergeConfig(config), [config])
 
-      offsets[index * 3] = (u - 0.5) * width + xSeed * jitter
-      offsets[index * 3 + 1] = (v - 0.5) * height + ySeed * jitter
-      offsets[index * 3 + 2] = 0
-      randoms[index] = seed
-      index += 1
-    }
-  }
+  const countX = 100
+  const countY = 55
+  const count = countX * countY
 
-  geometry.setAttribute("aOffset", new THREE.InstancedBufferAttribute(offsets, 3))
-  geometry.setAttribute("aRandom", new THREE.InstancedBufferAttribute(randoms, 1))
+  const geometry = useMemo(() => new THREE.PlaneGeometry(1, 1), [])
 
-  return geometry
-}
-
-function createParticleMaterial({
-  baseColor,
-  colorIntensity,
-  fieldStrength,
-}: Required<Pick<AntigravityProps, "baseColor" | "colorIntensity" | "fieldStrength">>) {
-  return new THREE.ShaderMaterial({
-    uniforms: {
+  const uniforms = useMemo(
+    () => ({
       uTime: { value: 0 },
       uMouse: { value: new THREE.Vector2(0, 0) },
-      uBaseColor: { value: new THREE.Color(baseColor) },
-      uColorIntensity: { value: colorIntensity },
-      uParticleColorBase: { value: new THREE.Color(MEDUSAE_MOTION_DEFAULTS.particles.colorBase) },
-      uParticleColorOne: { value: new THREE.Color(MEDUSAE_MOTION_DEFAULTS.particles.colorOne) },
-      uParticleColorTwo: { value: new THREE.Color(MEDUSAE_MOTION_DEFAULTS.particles.colorTwo) },
-      uParticleColorThree: { value: new THREE.Color(MEDUSAE_MOTION_DEFAULTS.particles.colorThree) },
-      uFieldStrength: { value: fieldStrength },
-      uOuterOscFrequency: { value: MEDUSAE_MOTION_DEFAULTS.halo.outerOscFrequency },
-      uOuterOscAmplitude: { value: MEDUSAE_MOTION_DEFAULTS.halo.outerOscAmplitude },
-      uHaloDisplayScale: { value: MEDUSAE_MOTION_DEFAULTS.halo.displayScale },
-      uHaloRadiusBase: { value: MEDUSAE_MOTION_DEFAULTS.halo.radiusBase },
-      uHaloRadiusAmplitude: { value: MEDUSAE_MOTION_DEFAULTS.halo.radiusAmplitude },
-      uHaloShapeAmplitude: { value: MEDUSAE_MOTION_DEFAULTS.halo.shapeAmplitude },
-      uHaloRimWidth: { value: MEDUSAE_MOTION_DEFAULTS.halo.rimWidth },
-      uHaloOuterStartOffset: { value: MEDUSAE_MOTION_DEFAULTS.halo.outerStartOffset },
-      uHaloOuterEndOffset: { value: MEDUSAE_MOTION_DEFAULTS.halo.outerEndOffset },
-      uHaloScaleX: { value: MEDUSAE_MOTION_DEFAULTS.halo.scaleX },
-      uHaloScaleY: { value: MEDUSAE_MOTION_DEFAULTS.halo.scaleY },
-      uParticleBaseSize: { value: MEDUSAE_MOTION_DEFAULTS.particles.baseSize },
-      uParticleActiveSize: { value: MEDUSAE_MOTION_DEFAULTS.particles.activeSize },
-      uParticleDisplayScale: { value: MEDUSAE_MOTION_DEFAULTS.particles.displayScale },
-      uBlobScaleX: { value: MEDUSAE_MOTION_DEFAULTS.particles.blobScaleX },
-      uBlobScaleY: { value: MEDUSAE_MOTION_DEFAULTS.particles.blobScaleY },
-      uParticleRotationSpeed: { value: MEDUSAE_MOTION_DEFAULTS.particles.rotationSpeed },
-      uParticleRotationJitter: { value: MEDUSAE_MOTION_DEFAULTS.particles.rotationJitter },
-      uParticleOscillationFactor: { value: MEDUSAE_MOTION_DEFAULTS.particles.oscillationFactor },
-    },
-    vertexShader: `
-      uniform float uTime;
-      uniform vec2 uMouse;
-      uniform float uFieldStrength;
-      uniform float uOuterOscFrequency;
-      uniform float uOuterOscAmplitude;
-      uniform float uHaloDisplayScale;
-      uniform float uHaloRadiusBase;
-      uniform float uHaloRadiusAmplitude;
-      uniform float uHaloShapeAmplitude;
-      uniform float uHaloRimWidth;
-      uniform float uHaloOuterStartOffset;
-      uniform float uHaloOuterEndOffset;
-      uniform float uHaloScaleX;
-      uniform float uHaloScaleY;
-      uniform float uParticleBaseSize;
-      uniform float uParticleActiveSize;
-      uniform float uParticleDisplayScale;
-      uniform float uBlobScaleX;
-      uniform float uBlobScaleY;
-      uniform float uParticleRotationSpeed;
-      uniform float uParticleRotationJitter;
-      uniform float uParticleOscillationFactor;
-
-      attribute vec3 aOffset;
-      attribute float aRandom;
-
-      varying vec2 vUv;
-      varying vec2 vPos;
-      varying float vInfluence;
-
-      mat2 rotate2d(float angle) {
-        float s = sin(angle);
-        float c = cos(angle);
-        return mat2(c, -s, s, c);
-      }
-
-      float hash(vec2 p) {
-        return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
-      }
-
-      float noise(vec2 p) {
-        vec2 i = floor(p);
-        vec2 f = fract(p);
-        f = f * f * (3.0 - 2.0 * f);
-
-        float a = hash(i);
-        float b = hash(i + vec2(1.0, 0.0));
-        float c = hash(i + vec2(0.0, 1.0));
-        float d = hash(i + vec2(1.0, 1.0));
-
-        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-      }
-
-      void main() {
-        vUv = uv;
-
-        vec3 pos = aOffset;
-        float phase = aRandom * 6.28318530718;
-        float slowTime = uTime * 0.15;
-
-        float driftX = sin(slowTime + pos.y * 0.5) + sin(slowTime * 0.5 + pos.y * 2.0);
-        float driftY = cos(slowTime + pos.x * 0.5) + cos(slowTime * 0.5 + pos.x * 2.0);
-        pos.x += driftX * 0.25;
-        pos.y += driftY * 0.25;
-
-        vec2 relToMouse = pos.xy - uMouse;
-        vec2 haloScale = max(vec2(uHaloScaleX, uHaloScaleY), vec2(0.0001));
-        float dist = length(relToMouse / haloScale);
-        vec2 dirToMouse = normalize(relToMouse + vec2(0.0001, 0.0));
-
-        float shapeNoise = noise(dirToMouse * 2.0 + vec2(0.0, uTime * 0.1));
-        float breath = sin(uTime * 0.8);
-        float baseRadius = (uHaloRadiusBase + breath * uHaloRadiusAmplitude) * uHaloDisplayScale;
-        float radius = baseRadius + shapeNoise * uHaloShapeAmplitude * uHaloDisplayScale;
-        float rimWidth = uHaloRimWidth * uHaloDisplayScale;
-        float outerStartOffset = uHaloOuterStartOffset * uHaloDisplayScale;
-        float outerEndOffset = uHaloOuterEndOffset * uHaloDisplayScale;
-        float rimInfluence = smoothstep(rimWidth, 0.0, abs(dist - radius));
-        float outerInfluence = smoothstep(baseRadius + outerStartOffset, baseRadius + outerEndOffset, dist);
-        float outerWave = sin(uTime * uOuterOscFrequency + pos.x * 0.6 + pos.y * 0.6);
-
-        float pushAmount = (breath * 0.5 + 0.5) * 0.5;
-        pos.xy += dirToMouse * pushAmount * rimInfluence * uFieldStrength;
-        pos.xy += dirToMouse * outerWave * uOuterOscAmplitude * outerInfluence * uFieldStrength;
-        pos.z += rimInfluence * 0.3 * sin(uTime);
-
-        float influence = rimInfluence;
-        float baseSize = uParticleBaseSize + sin(uTime + pos.x) * 0.003;
-        float activeSize = uParticleActiveSize;
-        float currentScale = baseSize + rimInfluence * activeSize;
-        float stretch = rimInfluence * 0.02;
-
-        vec3 transformed = position;
-        transformed.x *= (currentScale + stretch) * uBlobScaleX;
-        transformed.y *= currentScale * uBlobScaleY;
-        transformed.xy *= uParticleDisplayScale;
-
-        float dirLen = max(length(relToMouse), 0.0001);
-        vec2 dir = relToMouse / dirLen;
-        float osc = 0.5 + 0.5 * sin(uTime * (0.25 + uParticleOscillationFactor * 0.35) + phase);
-        float speedScale = mix(0.55, 1.35, osc) * (0.8 + uParticleOscillationFactor * 0.2);
-        float jitterScale = mix(0.7, 1.45, osc) * (0.85 + uParticleOscillationFactor * 0.15);
-        float jitter = sin(uTime * uParticleRotationSpeed * speedScale + pos.x * 0.35 + pos.y * 0.35) * (uParticleRotationJitter * jitterScale);
-        vec2 perp = vec2(-dir.y, dir.x);
-        vec2 jitteredDir = normalize(dir + perp * jitter);
-        mat2 rot = mat2(jitteredDir.x, jitteredDir.y, -jitteredDir.y, jitteredDir.x);
-        transformed.xy = rot * transformed.xy;
-
-        vInfluence = influence;
-        vPos = pos.xy;
-
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos + transformed, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform float uTime;
-      uniform vec3 uBaseColor;
-      uniform float uColorIntensity;
-      uniform vec3 uParticleColorBase;
-      uniform vec3 uParticleColorOne;
-      uniform vec3 uParticleColorTwo;
-      uniform vec3 uParticleColorThree;
-
-      varying vec2 vUv;
-      varying vec2 vPos;
-      varying float vInfluence;
-
-      void main() {
-        vec2 center = vec2(0.5);
-        vec2 local = abs(vUv - center) * 2.0;
-        float d = pow(pow(local.x, 2.6) + pow(local.y, 2.6), 1.0 / 2.6);
-        float alpha = 1.0 - smoothstep(0.8, 1.0, d);
-
-        if (alpha < 0.01) discard;
-
-        vec3 baseParticleColor = mix(uParticleColorBase, uBaseColor, 1.0 - uColorIntensity);
-        vec3 colorOne = uParticleColorOne;
-        vec3 colorTwo = uParticleColorTwo;
-        vec3 colorThree = uParticleColorThree;
-
-        float t = uTime * 1.2;
-        float p1 = sin(vPos.x * 0.8 + t);
-        float p2 = sin(vPos.y * 0.8 + t * 0.8 + p1);
-
-        vec3 activeColor = mix(colorOne, colorTwo, p1 * 0.5 + 0.5);
-        activeColor = mix(activeColor, colorThree, p2 * 0.5 + 0.5);
-
-        float colorMix = smoothstep(0.1, 0.8, vInfluence) * uColorIntensity;
-        vec3 finalColor = mix(baseParticleColor, activeColor, colorMix);
-        float finalAlpha = alpha * mix(0.22, 0.68, vInfluence);
-
-        gl_FragColor = vec4(finalColor, finalAlpha);
-      }
-    `,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.NormalBlending,
-  })
-}
-
-function AntigravityParticles({
-  particleColumns = 100,
-  particleRows = 55,
-  baseColor = MEDUSAE_MOTION_DEFAULTS.particles.colorBase,
-  colorIntensity = 1,
-  fieldStrength = 1,
-}: AntigravityProps) {
-  const { viewport } = useThree()
-  const smoothMouse = useRef(new THREE.Vector2(0, 0))
-  const globalPointer = useRef<{ x: number; y: number } | null>(null)
-  const hovering = useRef(true)
-  const count = particleColumns * particleRows
-  const fieldWidth = Math.max(viewport.width * 1.12, 40)
-  const fieldHeight = Math.max(viewport.height * 1.12, 22)
-
-  const geometry = useMemo(
-    () =>
-      createParticleGeometry({
-        columns: particleColumns,
-        rows: particleRows,
-        width: fieldWidth,
-        height: fieldHeight,
-      }),
-    [fieldHeight, fieldWidth, particleColumns, particleRows]
+      uResolution: {
+        value: new THREE.Vector2(window.innerWidth, window.innerHeight),
+      },
+      uOuterOscFrequency: { value: MEDUSAE_DEFAULTS.halo.outerOscFrequency },
+      uOuterOscAmplitude: { value: MEDUSAE_DEFAULTS.halo.outerOscAmplitude },
+      uHaloRadiusBase: { value: MEDUSAE_DEFAULTS.halo.radiusBase },
+      uHaloRadiusAmplitude: { value: MEDUSAE_DEFAULTS.halo.radiusAmplitude },
+      uHaloShapeAmplitude: { value: MEDUSAE_DEFAULTS.halo.shapeAmplitude },
+      uHaloRimWidth: { value: MEDUSAE_DEFAULTS.halo.rimWidth },
+      uHaloOuterStartOffset: { value: MEDUSAE_DEFAULTS.halo.outerStartOffset },
+      uHaloOuterEndOffset: { value: MEDUSAE_DEFAULTS.halo.outerEndOffset },
+      uHaloScaleX: { value: MEDUSAE_DEFAULTS.halo.scaleX },
+      uHaloScaleY: { value: MEDUSAE_DEFAULTS.halo.scaleY },
+      uParticleBaseSize: { value: MEDUSAE_DEFAULTS.particles.baseSize },
+      uParticleActiveSize: { value: MEDUSAE_DEFAULTS.particles.activeSize },
+      uBlobScaleX: { value: MEDUSAE_DEFAULTS.particles.blobScaleX },
+      uBlobScaleY: { value: MEDUSAE_DEFAULTS.particles.blobScaleY },
+      uParticleRotationSpeed: { value: MEDUSAE_DEFAULTS.particles.rotationSpeed },
+      uParticleRotationJitter: { value: MEDUSAE_DEFAULTS.particles.rotationJitter },
+      uParticleOscillationFactor: { value: MEDUSAE_DEFAULTS.particles.oscillationFactor },
+      uParticleColorBase: {
+        value: new THREE.Color(MEDUSAE_DEFAULTS.particles.colorBase),
+      },
+      uParticleColorOne: {
+        value: new THREE.Color(MEDUSAE_DEFAULTS.particles.colorOne),
+      },
+      uParticleColorTwo: {
+        value: new THREE.Color(MEDUSAE_DEFAULTS.particles.colorTwo),
+      },
+      uParticleColorThree: {
+        value: new THREE.Color(MEDUSAE_DEFAULTS.particles.colorThree),
+      },
+    }),
+    []
   )
 
   const material = useMemo(
     () =>
-      createParticleMaterial({
-        baseColor,
-        colorIntensity,
-        fieldStrength,
+      new THREE.ShaderMaterial({
+        uniforms,
+        vertexShader: `
+            uniform float uTime;
+            uniform vec2 uMouse;
+            uniform float uOuterOscFrequency;
+            uniform float uOuterOscAmplitude;
+            uniform float uHaloRadiusBase;
+            uniform float uHaloRadiusAmplitude;
+            uniform float uHaloShapeAmplitude;
+            uniform float uHaloRimWidth;
+            uniform float uHaloOuterStartOffset;
+            uniform float uHaloOuterEndOffset;
+            uniform float uHaloScaleX;
+            uniform float uHaloScaleY;
+            uniform float uParticleBaseSize;
+            uniform float uParticleActiveSize;
+            uniform float uBlobScaleX;
+            uniform float uBlobScaleY;
+            uniform float uParticleRotationSpeed;
+            uniform float uParticleRotationJitter;
+            uniform float uParticleOscillationFactor;
+            uniform vec3 uParticleColorBase;
+            uniform vec3 uParticleColorOne;
+            uniform vec3 uParticleColorTwo;
+            uniform vec3 uParticleColorThree;
+            varying vec2 vUv;
+            varying float vSize;
+            varying vec2 vPos;
+            
+            attribute vec3 aOffset; 
+            attribute float aRandom;
+
+            float hash(vec2 p) {
+                return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+            }
+            float noise(vec2 p) {
+                vec2 i = floor(p);
+                vec2 f = fract(p);
+                f = f * f * (3.0 - 2.0 * f);
+                
+                float a = hash(i);
+                float b = hash(i + vec2(1.0, 0.0));
+                float c = hash(i + vec2(0.0, 1.0));
+                float d = hash(i + vec2(1.0, 1.0));
+                
+                return mix( mix(a, b, f.x), mix(c, d, f.x), f.y);
+            }
+
+            void main() {
+                vUv = uv;
+                
+                vec3 pos = aOffset;
+                
+                float driftSpeed = uTime * 0.15;
+                
+                float dx = sin(driftSpeed + pos.y * 0.5) + sin(driftSpeed * 0.5 + pos.y * 2.0);
+                float dy = cos(driftSpeed + pos.x * 0.5) + cos(driftSpeed * 0.5 + pos.x * 2.0);
+                
+                pos.x += dx * 0.25; 
+                pos.y += dy * 0.25;
+
+                vec2 relToMouse = pos.xy - uMouse;
+                vec2 haloScale = max(vec2(uHaloScaleX, uHaloScaleY), vec2(0.0001));
+                float distFromMouse = length(relToMouse / haloScale);
+                vec2 dirToMouse = normalize(relToMouse + vec2(0.0001, 0.0));
+                
+                float shapeFactor = noise(dirToMouse * 2.0 + vec2(0.0, uTime * 0.1));
+                
+                float radiusBase = uHaloRadiusBase;
+                float radiusAmplitude = uHaloRadiusAmplitude;
+                float shapeAmplitude = uHaloShapeAmplitude;
+                float rimWidth = uHaloRimWidth;
+                float outerStartOffset = uHaloOuterStartOffset;
+                float outerEndOffset = uHaloOuterEndOffset;
+
+                float breathCycle = sin(uTime * 0.8);
+                
+                float baseRadius = radiusBase + breathCycle * radiusAmplitude;
+                float currentRadius = baseRadius + (shapeFactor * shapeAmplitude);
+                
+                float dist = distFromMouse; 
+                float rimInfluence = smoothstep(rimWidth, 0.0, abs(dist - currentRadius));
+                
+                vec2 pushDir = normalize(relToMouse + vec2(0.0001, 0.0));
+                
+                float pushAmt = (breathCycle * 0.5 + 0.5) * 0.5;
+                
+                pos.xy += pushDir * pushAmt * rimInfluence;
+                
+                pos.z += rimInfluence * 0.3 * sin(uTime);
+
+                float outerInfluence = smoothstep(baseRadius + outerStartOffset, baseRadius + outerEndOffset, dist);
+                float outerOsc = sin(uTime * uOuterOscFrequency + pos.x * 0.6 + pos.y * 0.6);
+                pos.xy += normalize(relToMouse + vec2(0.0001, 0.0)) * outerOsc * uOuterOscAmplitude * outerInfluence;
+
+                float baseSize = uParticleBaseSize + (sin(uTime + pos.x)*0.003);
+                
+                float activeSize = uParticleActiveSize; 
+                float currentScale = baseSize + (rimInfluence * activeSize);
+                
+                float stretch = rimInfluence * 0.02;
+                
+                vec3 transformed = position;
+                transformed.x *= (currentScale + stretch) * uBlobScaleX;
+                transformed.y *= currentScale * uBlobScaleY; 
+                
+                vSize = rimInfluence;
+                vPos = pos.xy;
+                
+                float dirLen = max(length(relToMouse), 0.0001);
+                vec2 dir = relToMouse / dirLen;
+                float oscPhase = aRandom * 6.28318530718;
+                float osc = 0.5 + 0.5 * sin(
+                  uTime * (0.25 + uParticleOscillationFactor * 0.35) + oscPhase
+                );
+                float speedScale = mix(0.55, 1.35, osc) * (0.8 + uParticleOscillationFactor * 0.2);
+                float jitterScale = mix(0.7, 1.45, osc) * (0.85 + uParticleOscillationFactor * 0.15);
+                float jitter = sin(
+                  uTime * uParticleRotationSpeed * speedScale + pos.x * 0.35 + pos.y * 0.35
+                ) * (uParticleRotationJitter * jitterScale);
+                vec2 perp = vec2(-dir.y, dir.x);
+                vec2 jitteredDir = normalize(dir + perp * jitter);
+                mat2 rot = mat2(jitteredDir.x, jitteredDir.y, -jitteredDir.y, jitteredDir.x);
+                transformed.xy = rot * transformed.xy;
+                
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(pos + transformed, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform float uTime;
+            uniform vec3 uParticleColorBase;
+            uniform vec3 uParticleColorOne;
+            uniform vec3 uParticleColorTwo;
+            uniform vec3 uParticleColorThree;
+            varying vec2 vUv;
+            varying float vSize;
+            varying vec2 vPos;
+
+            void main() {
+                vec2 center = vec2(0.5);
+                vec2 pos = abs(vUv - center) * 2.0; 
+                
+                float d = pow(pow(pos.x, 2.6) + pow(pos.y, 2.6), 1.0/2.6);
+                float alpha = 1.0 - smoothstep(0.8, 1.0, d);
+                
+                if (alpha < 0.01) discard;
+
+                vec3 black = uParticleColorBase;
+                vec3 cBlue = uParticleColorOne;
+                vec3 cRed = uParticleColorTwo;
+                vec3 cYellow = uParticleColorThree;
+                
+                float t = uTime * 1.2;
+                
+                float p1 = sin(vPos.x * 0.8 + t);
+                float p2 = sin(vPos.y * 0.8 + t * 0.8 + p1);
+                
+                vec3 activeColor = mix(cBlue, cRed, p1 * 0.5 + 0.5);
+                activeColor = mix(activeColor, cYellow, p2 * 0.5 + 0.5);
+                
+                vec3 finalColor = mix(black, activeColor, smoothstep(0.1, 0.8, vSize));
+                float finalAlpha = alpha * mix(0.4, 0.95, vSize);
+
+                gl_FragColor = vec4(finalColor, finalAlpha);
+            }
+        `,
+        transparent: true,
+        depthWrite: false,
       }),
-    [baseColor, colorIntensity, fieldStrength]
+    [uniforms]
   )
 
   useEffect(() => {
-    return () => {
-      geometry.dispose()
-      material.dispose()
+    material.uniforms.uOuterOscFrequency.value = merged.halo.outerOscFrequency
+    material.uniforms.uOuterOscAmplitude.value = merged.halo.outerOscAmplitude
+    material.uniforms.uHaloRadiusBase.value = merged.halo.radiusBase
+    material.uniforms.uHaloRadiusAmplitude.value = merged.halo.radiusAmplitude
+    material.uniforms.uHaloShapeAmplitude.value = merged.halo.shapeAmplitude
+    material.uniforms.uHaloRimWidth.value = merged.halo.rimWidth
+    material.uniforms.uHaloOuterStartOffset.value = merged.halo.outerStartOffset
+    material.uniforms.uHaloOuterEndOffset.value = merged.halo.outerEndOffset
+    material.uniforms.uHaloScaleX.value = merged.halo.scaleX
+    material.uniforms.uHaloScaleY.value = merged.halo.scaleY
+    material.uniforms.uParticleBaseSize.value = merged.particles.baseSize
+    material.uniforms.uParticleActiveSize.value = merged.particles.activeSize
+    material.uniforms.uBlobScaleX.value = merged.particles.blobScaleX
+    material.uniforms.uBlobScaleY.value = merged.particles.blobScaleY
+    material.uniforms.uParticleRotationSpeed.value = merged.particles.rotationSpeed
+    material.uniforms.uParticleRotationJitter.value = merged.particles.rotationJitter
+    material.uniforms.uParticleOscillationFactor.value = merged.particles.oscillationFactor
+    material.uniforms.uParticleColorBase.value.set(merged.particles.colorBase)
+    material.uniforms.uParticleColorOne.value.set(merged.particles.colorOne)
+    material.uniforms.uParticleColorTwo.value.set(merged.particles.colorTwo)
+    material.uniforms.uParticleColorThree.value.set(merged.particles.colorThree)
+  }, [material, merged])
+
+  useEffect(() => {
+    if (!meshRef.current) return
+
+    const offsets = new Float32Array(count * 3)
+    const randoms = new Float32Array(count)
+
+    const gridWidth = 40
+    const gridHeight = 22
+    const jitter = 0.25
+
+    let i = 0
+    for (let y = 0; y < countY; y += 1) {
+      for (let x = 0; x < countX; x += 1) {
+        const u = x / (countX - 1)
+        const v = y / (countY - 1)
+
+        let px = (u - 0.5) * gridWidth
+        let py = (v - 0.5) * gridHeight
+
+        px += (Math.random() - 0.5) * jitter
+        py += (Math.random() - 0.5) * jitter
+
+        offsets[i * 3] = px
+        offsets[i * 3 + 1] = py
+        offsets[i * 3 + 2] = 0
+
+        randoms[i] = Math.random()
+        i += 1
+      }
     }
-  }, [geometry, material])
+
+    meshRef.current.geometry.setAttribute(
+      "aOffset",
+      new THREE.InstancedBufferAttribute(offsets, 3)
+    )
+    meshRef.current.geometry.setAttribute(
+      "aRandom",
+      new THREE.InstancedBufferAttribute(randoms, 1)
+    )
+  }, [count, countX, countY])
+
+  const hovering = useRef(true)
+  const globalPointer = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     const handleLeave = () => {
@@ -340,24 +393,27 @@ function AntigravityParticles({
     const handleEnter = () => {
       hovering.current = true
     }
-    const syncPointer = (event: PointerEvent) => {
+
+    document.body.addEventListener("mouseleave", handleLeave)
+    document.body.addEventListener("mouseenter", handleEnter)
+
+    return () => {
+      document.body.removeEventListener("mouseleave", handleLeave)
+      document.body.removeEventListener("mouseenter", handleEnter)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
       const x = (event.clientX / window.innerWidth) * 2 - 1
       const y = -(event.clientY / window.innerHeight) * 2 + 1
       globalPointer.current = { x, y }
     }
 
-    document.body.addEventListener("mouseleave", handleLeave)
-    document.body.addEventListener("mouseenter", handleEnter)
-    window.addEventListener("pointerenter", syncPointer)
-    window.addEventListener("pointermove", syncPointer)
-    window.addEventListener("pointerdown", syncPointer)
+    window.addEventListener("pointermove", handlePointerMove)
 
     return () => {
-      document.body.removeEventListener("mouseleave", handleLeave)
-      document.body.removeEventListener("mouseenter", handleEnter)
-      window.removeEventListener("pointerenter", syncPointer)
-      window.removeEventListener("pointermove", syncPointer)
-      window.removeEventListener("pointerdown", syncPointer)
+      window.removeEventListener("pointermove", handlePointerMove)
     }
   }, [])
 
@@ -372,37 +428,38 @@ function AntigravityParticles({
       const pointerSource = globalPointer.current ?? pointer
       const baseX = (pointerSource.x * viewport.width) / 2
       const baseY = (pointerSource.y * viewport.height) / 2
-      const time = clock.getElapsedTime()
-      const jitterRadius = Math.min(viewport.width, viewport.height) * MEDUSAE_MOTION_DEFAULTS.cursor.radius
-      const jitterX = (Math.sin(time * 0.35) + Math.sin(time * 0.77 + 1.2)) * 0.5
-      const jitterY = (Math.cos(time * 0.31) + Math.sin(time * 0.63 + 2.4)) * 0.5
-      const followStrength = MEDUSAE_MOTION_DEFAULTS.particles.cursorFollowStrength
-
-      targetX = (baseX + jitterX * jitterRadius * MEDUSAE_MOTION_DEFAULTS.cursor.strength) * followStrength
-      targetY = (baseY + jitterY * jitterRadius * MEDUSAE_MOTION_DEFAULTS.cursor.strength) * followStrength
+      const t = clock.getElapsedTime()
+      const jitterRadius = Math.min(viewport.width, viewport.height) * merged.cursor.radius
+      const jitterX = (Math.sin(t * 0.35) + Math.sin(t * 0.77 + 1.2)) * 0.5
+      const jitterY = (Math.cos(t * 0.31) + Math.sin(t * 0.63 + 2.4)) * 0.5
+      const followStrength = merged.particles.cursorFollowStrength
+      targetX = (baseX + jitterX * jitterRadius * merged.cursor.strength) * followStrength
+      targetY = (baseY + jitterY * jitterRadius * merged.cursor.strength) * followStrength
     }
+
+    const current = material.uniforms.uMouse.value
+    const dragFactor = merged.cursor.dragFactor
 
     if (targetX !== null && targetY !== null) {
-      const dragFactor = MEDUSAE_MOTION_DEFAULTS.cursor.dragFactor
-      smoothMouse.current.x += (targetX - smoothMouse.current.x) * dragFactor
-      smoothMouse.current.y += (targetY - smoothMouse.current.y) * dragFactor
+      current.x += (targetX - current.x) * dragFactor
+      current.y += (targetY - current.y) * dragFactor
     }
-
-    material.uniforms.uMouse.value.copy(smoothMouse.current)
   })
 
-  return <instancedMesh args={[geometry, material, count]} />
+  return <instancedMesh ref={meshRef} args={[geometry, material, count]} />
 }
 
-export function Antigravity(props: AntigravityProps) {
+export function Antigravity({ className, config, style }: AntigravityProps) {
+  const merged = useMemo(() => mergeConfig(config), [config])
+
   return (
-    <Canvas
-      camera={{ position: [0, 0, 42], fov: 35 }}
-      dpr={1}
-      gl={{ antialias: true, alpha: true }}
-      style={{ width: "100%", height: "100%" }}
-    >
-      <AntigravityParticles {...props} />
-    </Canvas>
+    <div className={className} style={{ width: "100%", height: "100%", position: "relative", ...style }}>
+      <Canvas camera={{ position: [0, 0, 5] }} style={{ width: "100%", height: "100%" }}>
+        <color attach="background" args={[merged.background.color]} />
+        <Particles config={config} />
+      </Canvas>
+    </div>
   )
 }
+
+export default Antigravity
